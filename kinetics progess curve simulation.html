@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kinetics simulation: progress curve</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --line: #d8e1e8;
+    --text: #1a2a36;
+    --sub: #576b78;
+    --teal: #0c7c7c;
+    --teal-dark: #085757;
+    --border-radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+  }
+  .app-container {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  header {
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 700; color: var(--text); }
+  header p { font-size: 0.88rem; color: var(--sub); margin-top: 4px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--sub);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+  }
+
+  select, input[type=number] {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fafbfc;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+  select:focus, input:focus { outline: 2px solid var(--teal); }
+
+  .eq-display {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-align: center;
+    background: #edf3f5;
+    padding: 12px 8px;
+    border-radius: 6px;
+    margin-top: 10px;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .field-row:last-child { margin-bottom: 0; }
+  .field-row label {
+    flex: 1;
+    font-size: 0.84rem;
+    color: var(--sub);
+  }
+  .field-row input[type=number] { width: 85px; }
+  .color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+  }
+  .btn-run {
+    background: var(--teal);
+    color: white;
+    margin-top: 12px;
+  }
+  .btn-run:hover { background: var(--teal-dark); }
+  .btn-outline {
+    background: transparent;
+    color: var(--sub);
+    border: 1px solid var(--line);
+    margin-top: 8px;
+  }
+  .btn-outline:hover { border-color: var(--sub); color: var(--text); }
+
+  /* Canvas Stage */
+  .canvas-stage {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--border-radius);
+    padding: 16px;
+  }
+  .stage-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-item span { width: 14px; height: 3px; border-radius: 2px; }
+
+  .canvas-wrapper {
+    position: relative;
+    width: 100%;
+    height: 420px;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .slope-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 0.82rem;
+  }
+  .slope-table th, .slope-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+  }
+  .slope-table th { color: var(--sub); font-size: 0.75rem; }
+  .badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <header>
+    <div>
+      <h1>kinetics simulation: progress curve</h1>
+      <p>Visualizing consumption &amp; formation curves with initial slopes scaled by stoichiometry: d[X<sub>i</sub>]/dt = &plusmn; &nu;<sub>i</sub> &middot; <i>r</i></p>
+    </div>
+    <div>
+      <button class="btn btn-outline" id="downloadHtmlBtn" style="padding: 6px 12px; font-size: 0.8rem; margin: 0;">Download This HTML</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Controls Sidebar -->
+    <div>
+      <div class="card">
+        <h2>Reaction Topology</h2>
+        <select id="modelSelector">
+          <option value="AB_C">aA + bB → cC (Bimolecular combination)</option>
+          <option value="AB_CD">aA + bB → cC + dD (Two Products)</option>
+          <option value="A_BC">aA → bB + cC (Decomposition)</option>
+          <option value="ABC_D">aA + bB + cC → dD (Termolecular Step)</option>
+        </select>
+        <div class="eq-display" id="equationDisplay"></div>
+      </div>
+
+      <div class="card">
+        <h2>Stoichiometric Coefficients (&nu;<sub>i</sub>)</h2>
+        <div id="coeffInputs"></div>
+      </div>
+
+      <div class="card">
+        <h2>Initial Concentrations (mM)</h2>
+        <div id="concInputs"></div>
+      </div>
+
+      <div class="card">
+        <h2>Kinetics Parameters</h2>
+        <div class="field-row">
+          <label for="rateInput">Initial Rate <i>r</i><sub>0</sub>:</label>
+          <input type="number" id="rateInput" step="0.05" min="0.01" value="0.50">
+          <span style="font-size:0.75rem; color:var(--sub); width:35px;">mM/s</span>
+        </div>
+        <p style="font-size:0.75rem; color:var(--sub); margin-top:6px;">
+          Rate law: <i>r</i> = <i>k</i> &middot; &prod; [Reactants]
+        </p>
+
+        <button class="btn btn-run" id="runBtn">Run Simulation</button>
+        <button class="btn btn-outline" id="resetBtn">Reset Defaults</button>
+      </div>
+    </div>
+
+    <!-- Output Stage -->
+    <div class="canvas-stage">
+      <div class="stage-toolbar">
+        <div class="legend" id="legend"></div>
+        <div style="font-size:0.8rem; color:var(--sub);">Hover over graph to view values</div>
+      </div>
+
+      <div class="canvas-wrapper">
+        <canvas id="simCanvas"></canvas>
+      </div>
+
+      <!-- Slope breakdown table -->
+      <table class="slope-table">
+        <thead>
+          <tr>
+            <th>Species</th>
+            <th>Stoichiometric Coeff (&nu;<sub>i</sub>)</th>
+            <th>Role</th>
+            <th>Initial Slope (d[X<sub>i</sub>]/dt |<sub>t=0</sub>)</th>
+          </tr>
+        </thead>
+        <tbody id="slopeTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = {
+  A: '#2a6fdb',
+  B: '#e0592a',
+  C: '#1e9e6b',
+  D: '#8e44ad'
+};
+
+const MODELS = {
+  AB_C: {
+    reactants: ['A', 'B'],
+    products: ['C'],
+    defaultCoeffs: { A: 2, B: 1, C: 1 },
+    defaultConcs: { A: 1.0, B: 1.0, C: 0.0 }
+  },
+  AB_CD: {
+    reactants: ['A', 'B'],
+    products: ['C', 'D'],
+    defaultCoeffs: { A: 1, B: 2, C: 1, D: 3 },
+    defaultConcs: { A: 1.5, B: 1.0, C: 0.0, D: 0.0 }
+  },
+  A_BC: {
+    reactants: ['A'],
+    products: ['B', 'C'],
+    defaultCoeffs: { A: 2, B: 1, C: 2 },
+    defaultConcs: { A: 2.0, B: 0.0, C: 0.0 }
+  },
+  ABC_D: {
+    reactants: ['A', 'B', 'C'],
+    products: ['D'],
+    defaultCoeffs: { A: 1, B: 1, C: 1, D: 2 },
+    defaultConcs: { A: 1.0, B: 1.0, C: 1.0, D: 0.0 }
+  }
+};
+
+let currentModelKey = 'AB_C';
+let coeffs = {};
+let concs = {};
+let initialRate = 0.50;
+let simulationResult = null;
+let hoveredTime = null;
+
+function getReactionRate(state, kRate, model) {
+  let rate = kRate;
+  for (let rKey of model.reactants) {
+    rate *= Math.max(state[rKey] || 0, 0);
+  }
+  return rate;
+}
+
+function computeDerivatives(state, kRate, model) {
+  const rate = getReactionRate(state, kRate, model);
+  const d = {};
+  model.reactants.forEach(sp => { d[sp] = -coeffs[sp] * rate; });
+  model.products.forEach(sp => { d[sp] = coeffs[sp] * rate; });
+  return d;
+}
+
+function rk4Step(state, kRate, model, dt) {
+  const add = (s, deriv, scale) => {
+    const res = {};
+    for (let k in s) res[k] = s[k] + deriv[k] * scale;
+    return res;
+  };
+  const k1 = computeDerivatives(state, kRate, model);
+  const k2 = computeDerivatives(add(state, k1, dt / 2), kRate, model);
+  const k3 = computeDerivatives(add(state, k2, dt / 2), kRate, model);
+  const k4 = computeDerivatives(add(state, k3, dt), kRate, model);
+
+  const next = {};
+  for (let sp in state) {
+    next[sp] = Math.max(0, state[sp] + (dt / 6) * (k1[sp] + 2 * k2[sp] + 2 * k3[sp] + k4[sp]));
+  }
+  return next;
+}
+
+function runSimulation() {
+  const model = MODELS[currentModelKey];
+  let denom = 1;
+  for (let rKey of model.reactants) {
+    denom *= Math.max(concs[rKey] || 0, 0);
+  }
+  const k = denom > 0 ? (initialRate / denom) : 0.1;
+
+  let state = { ...concs };
+  let t = 0;
+  const dt = 0.02;
+  const maxSteps = 2500;
+  const points = [{ t: 0, ...state }];
+
+  let maxConc = 0.1;
+  Object.keys(state).forEach(sp => { if (state[sp] > maxConc) maxConc = state[sp]; });
+
+  for (let step = 0; step < maxSteps; step++) {
+    state = rk4Step(state, k, model, dt);
+    t += dt;
+    points.push({ t, ...state });
+
+    Object.keys(state).forEach(sp => { if (state[sp] > maxConc) maxConc = state[sp]; });
+    const depleted = model.reactants.some(rKey => state[rKey] < 0.005);
+    if (depleted && t > 1.0) break;
+  }
+
+  simulationResult = { points, tFinal: t, maxConc: maxConc * 1.15 };
+  renderCanvas();
+  renderSlopeTable();
+}
+
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  renderCanvas();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function renderCanvas() {
+  if (!simulationResult) return;
+
+  const w = canvas.getBoundingClientRect().width;
+  const h = canvas.getBoundingClientRect().height;
+  const pad = { top: 25, right: 30, bottom: 40, left: 55 };
+
+  ctx.clearRect(0, 0, w, h);
+
+  const plotW = w - pad.left - pad.right;
+  const plotH = h - pad.top - pad.bottom;
+  const { points, tFinal, maxConc } = simulationResult;
+
+  const toX = (t) => pad.left + (t / tFinal) * plotW;
+  const toY = (c) => pad.top + plotH - (c / maxConc) * plotH;
+
+  ctx.strokeStyle = '#e6edf0';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#6b7f8e';
+  ctx.font = '11px -apple-system, sans-serif';
+
+  const xTicks = 6;
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= xTicks; i++) {
+    const tVal = (tFinal / xTicks) * i;
+    const x = toX(tVal);
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + plotH);
+    ctx.stroke();
+    ctx.fillText(tVal.toFixed(1) + 's', x, pad.top + plotH + 16);
+  }
+
+  const yTicks = 5;
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= yTicks; i++) {
+    const cVal = (maxConc / yTicks) * i;
+    const y = toY(cVal);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + plotW, y);
+    ctx.stroke();
+    ctx.fillText(cVal.toFixed(2), pad.left - 8, y + 4);
+  }
+
+  ctx.strokeStyle = '#a4b3be';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.stroke();
+
+  ctx.fillStyle = '#2c3e50';
+  ctx.font = '600 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Time t (seconds)', pad.left + plotW / 2, h - 8);
+
+  ctx.save();
+  ctx.translate(14, pad.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Concentration (mM)', 0, 0);
+  ctx.restore();
+
+  const model = MODELS[currentModelKey];
+  const allSpecies = [...model.reactants, ...model.products];
+
+  allSpecies.forEach(sp => {
+    ctx.strokeStyle = COLORS[sp];
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    points.forEach((p, idx) => {
+      const x = toX(p.t);
+      const y = toY(p[sp]);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  if (hoveredTime !== null && hoveredTime >= 0 && hoveredTime <= tFinal) {
+    const hX = toX(hoveredTime);
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(hX, pad.top);
+    ctx.lineTo(hX, pad.top + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const closest = points.reduce((prev, curr) => 
+      Math.abs(curr.t - hoveredTime) < Math.abs(prev.t - hoveredTime) ? curr : prev
+    );
+
+    allSpecies.forEach(sp => {
+      const py = toY(closest[sp]);
+      ctx.fillStyle = COLORS[sp];
+      ctx.beginPath();
+      ctx.arc(hX, py, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!simulationResult) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const pad = { left: 55, right: 30 };
+  const plotW = rect.width - pad.left - pad.right;
+
+  if (mouseX >= pad.left && mouseX <= pad.left + plotW) {
+    hoveredTime = ((mouseX - pad.left) / plotW) * simulationResult.tFinal;
+    renderCanvas();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredTime = null;
+  renderCanvas();
+});
+
+function buildControls() {
+  const model = MODELS[currentModelKey];
+  const coeffBox = document.getElementById('coeffInputs');
+  const concBox = document.getElementById('concInputs');
+  const allSpecies = [...model.reactants, ...model.products];
+
+  coeffBox.innerHTML = '';
+  concBox.innerHTML = '';
+
+  allSpecies.forEach(sp => {
+    const isReactant = model.reactants.includes(sp);
+    const color = COLORS[sp];
+
+    const cRow = document.createElement('div');
+    cRow.className = 'field-row';
+    cRow.innerHTML = `
+      <div class="color-dot" style="background:${color}"></div>
+      <label>Coefficient &nu;<sub>${sp}</sub> (${isReactant ? 'Reactant' : 'Product'}):</label>
+      <input type="number" id="c_${sp}" min="1" max="10" step="1" value="${coeffs[sp]}">
+    `;
+    coeffBox.appendChild(cRow);
+    cRow.querySelector('input').addEventListener('input', (e) => {
+      coeffs[sp] = parseInt(e.target.value, 10) || 1;
+      updateEquationDisplay();
+      renderSlopeTable();
+    });
+
+    const concRow = document.createElement('div');
+    concRow.className = 'field-row';
+    concRow.innerHTML = `
+      <div class="color-dot" style="background:${color}"></div>
+      <label>[${sp}]<sub>0</sub> initial:</label>
+      <input type="number" id="conc_${sp}" min="0" max="10" step="0.1" value="${concs[sp].toFixed(2)}">
+      <span style="font-size:0.75rem; color:var(--sub); width:35px;">mM</span>
+    `;
+    concBox.appendChild(concRow);
+    concRow.querySelector('input').addEventListener('input', (e) => {
+      concs[sp] = parseFloat(e.target.value) || 0;
+      renderSlopeTable();
+    });
+  });
+
+  updateEquationDisplay();
+  updateLegend();
+}
+
+function updateEquationDisplay() {
+  const model = MODELS[currentModelKey];
+  const format = (sp) => {
+    const c = coeffs[sp];
+    return `${c > 1 ? c : ''}<span style="color:${COLORS[sp]}">${sp}</span>`;
+  };
+  const rSide = model.reactants.map(format).join(' + ');
+  const pSide = model.products.map(format).join(' + ');
+  document.getElementById('equationDisplay').innerHTML = `${rSide} &rarr; ${pSide}`;
+}
+
+function updateLegend() {
+  const model = MODELS[currentModelKey];
+  const allSpecies = [...model.reactants, ...model.products];
+  const leg = document.getElementById('legend');
+  leg.innerHTML = allSpecies.map(sp => `
+    <div class="legend-item">
+      <span style="background:${COLORS[sp]}"></span>
+      <span style="color:${COLORS[sp]}">[${sp}]</span>
+    </div>
+  `).join('');
+}
+
+function renderSlopeTable() {
+  const model = MODELS[currentModelKey];
+  const allSpecies = [...model.reactants, ...model.products];
+  const tbody = document.getElementById('slopeTableBody');
+  tbody.innerHTML = '';
+
+  allSpecies.forEach(sp => {
+    const isReactant = model.reactants.includes(sp);
+    const nu = coeffs[sp];
+    const slope = (isReactant ? -nu : nu) * initialRate;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700; color:${COLORS[sp]}">[${sp}]</td>
+      <td>${nu}</td>
+      <td>${isReactant ? 'Reactant (Decaying)' : 'Product (Forming)'}</td>
+      <td>
+        <span class="badge" style="background:${isReactant ? '#ffeae6' : '#e6f8f0'}; color:${isReactant ? '#c0392b' : '#0c7c7c'}">
+          ${slope > 0 ? '+' : ''}${slope.toFixed(2)} mM/s
+        </span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function resetToModelDefaults() {
+  const model = MODELS[currentModelKey];
+  coeffs = { ...model.defaultCoeffs };
+  concs = { ...model.defaultConcs };
+  initialRate = 0.50;
+  document.getElementById('rateInput').value = "0.50";
+  buildControls();
+  runSimulation();
+}
+
+document.getElementById('modelSelector').addEventListener('change', (e) => {
+  currentModelKey = e.target.value;
+  resetToModelDefaults();
+});
+
+document.getElementById('rateInput').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  if (val > 0) {
+    initialRate = val;
+    renderSlopeTable();
+  }
+});
+
+document.getElementById('runBtn').addEventListener('click', runSimulation);
+document.getElementById('resetBtn').addEventListener('click', resetToModelDefaults);
+
+document.getElementById('downloadHtmlBtn').addEventListener('click', () => {
+  const content = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kinetics_simulation_progress_curve.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+resetToModelDefaults();
+setTimeout(resizeCanvas, 50);
+</script>
+</body>
+</html>
