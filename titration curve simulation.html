@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acid-Base Titration Curve Simulator</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-purple: #c084fc;
+            --accent-green: #4ade80;
+            --accent-orange: #fb923c;
+            --accent-red: #f87171;
+            --border: #475569;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 14px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent-blue);
+            margin-bottom: 4px;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 950px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .controls {
+            background-color: rgba(15, 23, 42, 0.6);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 4px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .control-header span.val {
+            color: var(--accent-blue);
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        select {
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 480px;
+            background-color: #090d16;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .readouts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+        }
+
+        .card {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .card-title {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .card-value {
+            font-size: 1rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Acid-Base Titration Curve Simulator</h1>
+        <p class="subtitle">Real-time titration curves with exact charge-balance equilibrium solver</p>
+    </header>
+
+    <div class="main-layout">
+        <div class="controls">
+            <div class="section-title">1. Reaction Chemistry</div>
+            <div class="control-group">
+                <label style="font-size: 0.8rem; color: var(--text-muted);">Titration System</label>
+                <select id="titrationMode">
+                    <option value="WA_SB" selected>Weak Acid + Strong Base (e.g. CH₃COOH / NaOH)</option>
+                    <option value="SA_SB">Strong Acid + Strong Base (e.g. HCl / NaOH)</option>
+                    <option value="WB_SA">Weak Base + Strong Acid (e.g. NH₃ / HCl)</option>
+                    <option value="SB_SA">Strong Base + Strong Acid (e.g. NaOH / HCl)</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="kaGroup">
+                <div class="control-header">
+                    <label id="kLabel">Acid p<i>K</i><sub>a</sub></label>
+                    <span class="val" id="pka-val">4.75</span>
+                </div>
+                <input type="range" id="pka" min="1.0" max="12.0" step="0.05" value="4.75">
+            </div>
+
+            <div class="section-title">2. Receiving Vessel</div>
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="Va">Initial Volume (<i>V</i><sub>1</sub>)</label>
+                    <span class="val" id="Va-val">10.0 mL</span>
+                </div>
+                <input type="range" id="Va" min="1.0" max="50.0" step="0.5" value="10.0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="Ca">Initial Conc (<i>C</i><sub>1</sub>)</label>
+                    <span class="val" id="Ca-val">0.100 M</span>
+                </div>
+                <input type="range" id="Ca" min="0.005" max="1.0" step="0.005" value="0.100">
+            </div>
+
+            <div class="section-title">3. Buret</div>
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="Ct">Titrant Conc (<i>C</i><sub>titrant</sub>)</label>
+                    <span class="val" id="Ct-val">0.100 M</span>
+                </div>
+                <input type="range" id="Ct" min="0.005" max="1.0" step="0.005" value="0.100">
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="titrationCanvas"></canvas>
+
+            <div class="readouts">
+                <div class="card">
+                    <div class="card-title">Initial pH</div>
+                    <div class="card-value" style="color: var(--accent-orange);" id="init-ph-out">2.88</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Equivalence Volume</div>
+                    <div class="card-value" style="color: var(--accent-blue);" id="veq-out">10.00 mL</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Equivalence pH</div>
+                    <div class="card-value" style="color: var(--accent-green);" id="eq-ph-out">8.73</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Half-Equiv. pH</div>
+                    <div class="card-value" style="color: var(--accent-purple);" id="half-ph-out">4.75</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modeSelect = document.getElementById('titrationMode');
+    const vaInput = document.getElementById('Va');
+    const caInput = document.getElementById('Ca');
+    const pkaInput = document.getElementById('pka');
+    const ctInput = document.getElementById('Ct');
+    const kaGroup = document.getElementById('kaGroup');
+    const kLabel = document.getElementById('kLabel');
+
+    const vaVal = document.getElementById('Va-val');
+    const caVal = document.getElementById('Ca-val');
+    const pkaVal = document.getElementById('pka-val');
+    const ctVal = document.getElementById('Ct-val');
+
+    const initPhOut = document.getElementById('init-ph-out');
+    const veqOut = document.getElementById('veq-out');
+    const eqPhOut = document.getElementById('eq-ph-out');
+    const halfPhOut = document.getElementById('half-ph-out');
+
+    const canvas = document.getElementById('titrationCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const Kw = 1e-14;
+
+    function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        draw();
+    }
+
+    // Exact Charge-Balance Equilibrium Solver (Bisection method)
+    function calculateExactPH(mode, Va, Ca, Ct, pK, Vt) {
+        const Vtot = Va + Vt;
+        const C_A = (Ca * Va) / Vtot;
+        const C_T = (Ct * Vt) / Vtot;
+        const K = Math.pow(10, -pK);
+
+        function chargeDiff(pH) {
+            const H = Math.pow(10, -pH);
+            const OH = Kw / H;
+
+            let chargeA = 0;
+            let chargeT = 0;
+
+            if (mode === "SA_SB") {
+                chargeA = -C_A;
+                chargeT = C_T;
+            } else if (mode === "SB_SA") {
+                chargeA = C_A;
+                chargeT = -C_T;
+            } else if (mode === "WA_SB") {
+                const alphaA = K / (H + K);
+                chargeA = -C_A * alphaA;
+                chargeT = C_T;
+            } else if (mode === "WB_SA") {
+                const Ka_conj = Kw / K;
+                const alphaBH = H / (H + Ka_conj);
+                chargeA = C_A * alphaBH;
+                chargeT = -C_T;
+            }
+
+            return (H - OH) + chargeA + chargeT;
+        }
+
+        let low = 0.0;
+        let high = 14.0;
+        let fLow = chargeDiff(low);
+
+        for (let iter = 0; iter < 50; iter++) {
+            const mid = (low + high) / 2;
+            const fMid = chargeDiff(mid);
+
+            if (Math.abs(fMid) < 1e-14 || (high - low) < 1e-8) {
+                return mid;
+            }
+
+            if ((fLow > 0 && fMid > 0) || (fLow < 0 && fMid < 0)) {
+                low = mid;
+                fLow = fMid;
+            } else {
+                high = mid;
+            }
+        }
+        return (low + high) / 2;
+    }
+
+    function drawAnnotation(ctx, text, x, y, color, dpr, alignRight = false) {
+        ctx.font = `bold ${11 * dpr}px sans-serif`;
+        const textWidth = ctx.measureText(text).width;
+        const boxPadding = 6 * dpr;
+        const boxWidth = textWidth + boxPadding * 2;
+        const boxHeight = 20 * dpr;
+        
+        let boxX = alignRight ? x - boxWidth - 10 * dpr : x + 10 * dpr;
+        let boxY = y - boxHeight / 2;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1 * dpr;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4 * dpr);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, boxX + boxPadding, boxY + boxHeight / 2);
+    }
+
+    function draw() {
+        const mode = modeSelect.value;
+        const Va = parseFloat(vaInput.value);
+        const Ca = parseFloat(caInput.value);
+        const Ct = parseFloat(ctInput.value);
+        const pK = parseFloat(pkaInput.value);
+
+        if (mode === "SA_SB" || mode === "SB_SA") {
+            kaGroup.style.display = "none";
+        } else {
+            kaGroup.style.display = "flex";
+            kLabel.innerHTML = mode === "WA_SB" ? "Acid p<i>K</i><sub>a</sub>" : "Base p<i>K</i><sub>b</sub>";
+        }
+
+        vaVal.textContent = Va.toFixed(1) + ' mL';
+        caVal.textContent = Ca.toFixed(3) + ' M';
+        ctVal.textContent = Ct.toFixed(3) + ' M';
+        pkaVal.textContent = pK.toFixed(2);
+
+        const Veq = (Ca * Va) / Ct;
+        const maxVt = Math.max(Veq * 1.8, 2);
+
+        const initPH = calculateExactPH(mode, Va, Ca, Ct, pK, 0);
+        const eqPH = calculateExactPH(mode, Va, Ca, Ct, pK, Veq);
+        const isWeak = (mode === "WA_SB" || mode === "WB_SA");
+        const halfPH = isWeak ? calculateExactPH(mode, Va, Ca, Ct, pK, Veq / 2) : "N/A";
+
+        initPhOut.textContent = initPH.toFixed(2);
+        veqOut.textContent = Veq.toFixed(2) + ' mL';
+        eqPhOut.textContent = eqPH.toFixed(2);
+        halfPhOut.textContent = typeof halfPH === "number" ? halfPH.toFixed(2) : halfPH;
+
+        // Canvas Setup
+        const w = canvas.width;
+        const h = canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const padding = { top: 30 * dpr, right: 30 * dpr, bottom: 50 * dpr, left: 55 * dpr };
+        const graphW = w - padding.left - padding.right;
+        const graphH = h - padding.top - padding.bottom;
+
+        function xToPx(v) { return padding.left + (v / maxVt) * graphW; }
+        function yToPx(ph) { return padding.top + graphH - (ph / 14.0) * graphH; }
+
+        // Grid lines & Y axis (pH 0-14)
+        ctx.strokeStyle = '#243049';
+        ctx.lineWidth = 1 * dpr;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = `${10 * dpr}px sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        for (let ph = 0; ph <= 14; ph += 2) {
+            const py = yToPx(ph);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, py);
+            ctx.lineTo(padding.left + graphW, py);
+            ctx.stroke();
+            ctx.fillText(ph, padding.left - 8 * dpr, py);
+        }
+
+        // X axis ticks
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const numTicks = 6;
+        for (let i = 0; i <= numTicks; i++) {
+            const v = (i / numTicks) * maxVt;
+            const px = xToPx(v);
+            ctx.beginPath();
+            ctx.moveTo(px, padding.top + graphH);
+            ctx.lineTo(px, padding.top + graphH + 5 * dpr);
+            ctx.stroke();
+            ctx.fillText(v.toFixed(1), px, padding.top + graphH + 10 * dpr);
+        }
+
+        // Axis Titles
+        ctx.fillText('Titrant Volume (mL)', padding.left + graphW / 2, h - 18 * dpr);
+
+        ctx.save();
+        ctx.translate(16 * dpr, padding.top + graphH / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText('pH', 0, 0);
+        ctx.restore();
+
+        // Guidelines
+        ctx.setLineDash([4 * dpr, 4 * dpr]);
+        ctx.strokeStyle = 'rgba(74, 222, 128, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(xToPx(Veq), padding.top);
+        ctx.lineTo(xToPx(Veq), padding.top + graphH);
+        ctx.stroke();
+
+        if (isWeak) {
+            ctx.strokeStyle = 'rgba(192, 132, 252, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(xToPx(Veq / 2), padding.top);
+            ctx.lineTo(xToPx(Veq / 2), padding.top + graphH);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        // Titration Curve
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.5 * dpr;
+        ctx.beginPath();
+
+        const steps = 600;
+        for (let i = 0; i <= steps; i++) {
+            const vt = (i / steps) * maxVt;
+            const ph = calculateExactPH(mode, Va, Ca, Ct, pK, vt);
+            const px = xToPx(vt);
+            const py = yToPx(Math.min(Math.max(ph, 0), 14));
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // Initial pH Dot + Callout
+        const initPx = xToPx(0);
+        const initPy = yToPx(initPH);
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath();
+        ctx.arc(initPx, initPy, 5 * dpr, 0, 2 * Math.PI);
+        ctx.fill();
+        drawAnnotation(ctx, `Initial pH: ${initPH.toFixed(2)}`, initPx, initPy, '#fb923c', dpr, false);
+
+        // Half-Equivalence Point Dot + Callout
+        if (isWeak) {
+            const halfPx = xToPx(Veq / 2);
+            const halfPy = yToPx(halfPH);
+            ctx.fillStyle = '#c084fc';
+            ctx.beginPath();
+            ctx.arc(halfPx, halfPy, 5 * dpr, 0, 2 * Math.PI);
+            ctx.fill();
+            const halfLabel = mode === "WA_SB" ? `Half-Eq (pH=pKa): ${halfPH.toFixed(2)}` : `Half-Eq (pH=14-pKb): ${halfPH.toFixed(2)}`;
+            drawAnnotation(ctx, halfLabel, halfPx, halfPy, '#c084fc', dpr, false);
+        }
+
+        // Equivalence Point Dot + Callout
+        const eqPx = xToPx(Veq);
+        const eqPy = yToPx(eqPH);
+        ctx.fillStyle = '#4ade80';
+        ctx.beginPath();
+        ctx.arc(eqPx, eqPy, 5.5 * dpr, 0, 2 * Math.PI);
+        ctx.fill();
+        drawAnnotation(ctx, `Eq. Point: (${Veq.toFixed(1)} mL, pH ${eqPH.toFixed(2)})`, eqPx, eqPy, '#4ade80', dpr, true);
+    }
+
+    [modeSelect, vaInput, caInput, pkaInput, ctInput].forEach(el => {
+        el.addEventListener('input', draw);
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('load', resizeCanvas);
+</script>
+
+</body>
+</html>

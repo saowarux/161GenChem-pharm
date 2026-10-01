@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chemical Equilibrium Simulation - Variable Stoichiometry</title>
+<style>
+  :root {
+    --blue-col: #2563eb;
+    --blue-bg: #dbeafe;
+    --orange-col: #ea580c;
+    --orange-bg: #ffedd5;
+    --slate-border: #cbd5e1;
+    --bg-main: #f8fafc;
+    --text-main: #0f172a;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    padding: 24px;
+  }
+
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header {
+    background: #ffffff;
+    padding: 20px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--slate-border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 6px;
+  }
+
+  header p {
+    font-size: 0.95rem;
+    color: #64748b;
+  }
+
+  .controls-panel {
+    background: #ffffff;
+    padding: 20px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--slate-border);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    align-items: end;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .control-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .control-group label span.val {
+    color: #2563eb;
+    font-family: monospace;
+    font-weight: 700;
+  }
+
+  select, input[type="range"] {
+    width: 100%;
+    accent-color: #2563eb;
+  }
+
+  select {
+    padding: 8px 12px;
+    border: 1px solid var(--slate-border);
+    border-radius: 6px;
+    background-color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    grid-column: 1 / -1;
+    margin-top: 5px;
+  }
+
+  button {
+    padding: 9px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  button.btn-primary {
+    background: #2563eb;
+    color: #ffffff;
+  }
+  button.btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  button.btn-secondary {
+    background: #ffffff;
+    border: 1px solid var(--slate-border);
+    color: #334155;
+  }
+  button.btn-secondary:hover {
+    background: #f1f5f9;
+  }
+
+  .metrics-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+  }
+
+  .metric-card {
+    background: #ffffff;
+    padding: 14px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--slate-border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metric-card .title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .metric-card .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: monospace;
+  }
+
+  .badge-eq {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: fit-content;
+  }
+
+  .badge-eq.reached {
+    background-color: #dcfce7;
+    color: #15803d;
+  }
+
+  .badge-eq.progress {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+
+  .main-content {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 900px) {
+    .main-content {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid var(--slate-border);
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .table-container {
+    max-height: 480px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    text-align: center;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #f1f5f9;
+    padding: 10px 8px;
+    font-weight: 700;
+    color: #334155;
+    border-bottom: 2px solid #cbd5e1;
+    z-index: 2;
+  }
+
+  tbody td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    font-family: monospace;
+  }
+
+  .col-blue {
+    background-color: var(--blue-bg);
+    color: #1e40af;
+    font-weight: 700;
+  }
+
+  .col-orange {
+    background-color: var(--orange-bg);
+    color: #c2410c;
+    font-weight: 700;
+  }
+
+  .col-change {
+    color: #475569;
+    font-size: 0.85rem;
+  }
+
+  tr.eq-row {
+    outline: 2.5px solid #0f172a;
+    outline-offset: -2px;
+    background-color: #f8fafc;
+  }
+
+  svg.chart {
+    width: 100%;
+    height: 440px;
+    background: #ffffff;
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 10px;
+    justify-content: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Chemical Equilibrium Simulator</h1>
+    <p>Discrete kinetic steps & percentage equilibrium for reversible reactions with variable stoichiometry.</p>
+  </header>
+
+  <div class="controls-panel">
+    <div class="control-group">
+      <label for="stoichSelect">Reaction Stoichiometry</label>
+      <select id="stoichSelect">
+        <option value="1:1" selected>1 A (blue) ⇌ 1 B (orange)</option>
+        <option value="1:2">1 A (blue) ⇌ 2 B (orange)</option>
+        <option value="2:1">2 A (blue) ⇌ 1 B (orange)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Initial Blue [A]: <span id="initAVal" class="val">100%</span></label>
+      <input type="range" id="initASlider" min="0" max="100" value="100" step="5">
+    </div>
+
+    <div class="control-group">
+      <label>Initial Orange [B]: <span id="initBVal" class="val">0%</span></label>
+      <input type="range" id="initBSlider" min="0" max="100" value="0" step="5">
+    </div>
+
+    <div class="control-group">
+      <label>Forward Rate (k_f): <span id="kfVal" class="val">0.50</span></label>
+      <input type="range" id="kfSlider" min="0.05" max="0.90" value="0.50" step="0.01">
+    </div>
+
+    <div class="control-group">
+      <label>Reverse Rate (k_r): <span id="krVal" class="val">0.17</span></label>
+      <input type="range" id="krSlider" min="0.05" max="0.90" value="0.17" step="0.01">
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-primary" id="stepBtn">Step Once</button>
+      <button class="btn-secondary" id="runBtn">Run to Equilibrium</button>
+      <button class="btn-secondary" id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="metrics-bar">
+    <div class="metric-card">
+      <div class="title">Status</div>
+      <div class="value" id="statusBadge"><span class="badge-eq progress">In Progress</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Current Step</div>
+      <div class="value" id="currentStepText">0 / 15</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Current Forward Rate</div>
+      <div class="value" id="rfMetric">0.00</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">Current Reverse Rate</div>
+      <div class="value" id="rrMetric">0.00</div>
+    </div>
+    <div class="metric-card">
+      <div class="title">K_eq (k_f / k_r)</div>
+      <div class="value" id="keqMetric">2.94</div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="card">
+      <div class="card-title">
+        <span>Discrete Simulation Table</span>
+        <span style="font-size: 0.8rem; font-weight: normal; color: #64748b;">Black outline = Equilibrium</span>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Blue [A]</th>
+              <th>Δ fwd</th>
+              <th>Δ rev</th>
+              <th>Orange [B]</th>
+              <th>|Δfwd - Δrev|</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Percentage vs Step (Time)</span>
+      </div>
+      <svg id="chartSvg" class="chart" viewBox="0 0 540 400"></svg>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: var(--blue-col);"></div>
+          <span>Reactant A (Blue)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: var(--orange-col);"></div>
+          <span>Product B (Orange)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let stoich = "1:1";
+  let kf = 0.50;
+  let kr = 0.17;
+  let initA = 100;
+  let initB = 0;
+  let historyData = [];
+  let maxSteps = 15;
+  let currentStep = 0;
+
+  const stoichSelect = document.getElementById("stoichSelect");
+  const initASlider = document.getElementById("initASlider");
+  const initBSlider = document.getElementById("initBSlider");
+  const kfSlider = document.getElementById("kfSlider");
+  const krSlider = document.getElementById("krSlider");
+
+  const initAVal = document.getElementById("initAVal");
+  const initBVal = document.getElementById("initBVal");
+  const kfVal = document.getElementById("kfVal");
+  const krVal = document.getElementById("krVal");
+
+  const stepBtn = document.getElementById("stepBtn");
+  const runBtn = document.getElementById("runBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const tableBody = document.getElementById("tableBody");
+  const chartSvg = document.getElementById("chartSvg");
+
+  const rfMetric = document.getElementById("rfMetric");
+  const rrMetric = document.getElementById("rrMetric");
+  const keqMetric = document.getElementById("keqMetric");
+  const statusBadge = document.getElementById("statusBadge");
+  const currentStepText = document.getElementById("currentStepText");
+
+  function computeStep(a, b) {
+    let rf = 0;
+    let rr = 0;
+    let deltaA = 0;
+    let deltaB = 0;
+
+    if (stoich === "1:1") {
+      rf = kf * a;
+      rr = kr * b;
+      deltaA = -rf + rr;
+      deltaB = rf - rr;
+    } else if (stoich === "1:2") {
+      rf = kf * a;
+      rr = kr * Math.pow(b / 100, 2) * 100;
+      deltaA = -rf + rr;
+      deltaB = 2 * rf - 2 * rr;
+    } else if (stoich === "2:1") {
+      rf = kf * Math.pow(a / 100, 2) * 100;
+      rr = kr * b;
+      deltaA = -2 * rf + 2 * rr;
+      deltaB = rf - rr;
+    }
+
+    let nextA = Math.max(0, a + deltaA);
+    let nextB = Math.max(0, b + deltaB);
+
+    return {
+      rf: rf,
+      rr: rr,
+      nextA: nextA,
+      nextB: nextB,
+      diff: Math.abs(rf - rr)
+    };
+  }
+
+  function resetSim() {
+    stoich = stoichSelect.value;
+    kf = parseFloat(kfSlider.value);
+    kr = parseFloat(krSlider.value);
+    initA = parseFloat(initASlider.value);
+    initB = parseFloat(initBSlider.value);
+
+    initAVal.textContent = initA + "%";
+    initBVal.textContent = initB + "%";
+    kfVal.textContent = kf.toFixed(2);
+    krVal.textContent = kr.toFixed(2);
+
+    let keq = (kf / kr).toFixed(2);
+    keqMetric.textContent = keq;
+
+    historyData = [{
+      step: 0,
+      a: initA,
+      b: initB,
+      rf: 0,
+      rr: 0,
+      diff: 999,
+      isEq: false
+    }];
+    currentStep = 0;
+    render();
+  }
+
+  function doStep() {
+    if (currentStep >= maxSteps) return;
+    let prev = historyData[currentStep];
+    let res = computeStep(prev.a, prev.b);
+
+    let isEq = res.diff < 0.5 || (currentStep > 0 && Math.abs(res.nextA - prev.a) < 0.2);
+
+    historyData.push({
+      step: currentStep + 1,
+      a: res.nextA,
+      b: res.nextB,
+      rf: res.rf,
+      rr: res.rr,
+      diff: res.diff,
+      isEq: isEq
+    });
+
+    currentStep++;
+    render();
+  }
+
+  function runToEquilibrium() {
+    while (currentStep < maxSteps) {
+      let prev = historyData[currentStep];
+      let res = computeStep(prev.a, prev.b);
+      let isEq = res.diff < 0.5 || (currentStep > 0 && Math.abs(res.nextA - prev.a) < 0.2);
+      
+      historyData.push({
+        step: currentStep + 1,
+        a: res.nextA,
+        b: res.nextB,
+        rf: res.rf,
+        rr: res.rr,
+        diff: res.diff,
+        isEq: isEq
+      });
+      currentStep++;
+      if (isEq && currentStep >= 4) break;
+    }
+    render();
+  }
+
+  function render() {
+    currentStepText.textContent = `${currentStep} / ${maxSteps}`;
+    let latest = historyData[historyData.length - 1];
+
+    rfMetric.textContent = latest.rf ? latest.rf.toFixed(1) : "0.0";
+    rrMetric.textContent = latest.rr ? latest.rr.toFixed(1) : "0.0";
+
+    let eqRowFound = false;
+    for (let i = 1; i < historyData.length; i++) {
+      if (historyData[i].isEq) {
+        eqRowFound = true;
+        break;
+      }
+    }
+
+    if (eqRowFound) {
+      statusBadge.innerHTML = `<span class="badge-eq reached">Equilibrium Reached</span>`;
+    } else {
+      statusBadge.innerHTML = `<span class="badge-eq progress">In Progress</span>`;
+    }
+
+    // Render Table
+    let tableHtml = "";
+    let firstEqIndex = -1;
+
+    for (let i = 0; i < historyData.length; i++) {
+      let row = historyData[i];
+      let isEquilibriumRow = false;
+      if (row.isEq && firstEqIndex === -1 && i > 0) {
+        firstEqIndex = i;
+      }
+      if (firstEqIndex !== -1 && i === firstEqIndex) {
+        isEquilibriumRow = true;
+      }
+
+      let dFwdText = i === 0 ? "-" : row.rf.toFixed(1);
+      let dRevText = i === 0 ? "-" : row.rr.toFixed(1);
+      let diffText = i === 0 ? "-" : row.diff.toFixed(1);
+
+      tableHtml += `
+        <tr class="${isEquilibriumRow ? 'eq-row' : ''}">
+          <td style="font-weight: 600;">${row.step}</td>
+          <td class="col-blue">${row.a.toFixed(1)}</td>
+          <td class="col-change">${dFwdText}</td>
+          <td class="col-change">${dRevText}</td>
+          <td class="col-orange">${row.b.toFixed(1)}</td>
+          <td style="color: ${row.diff < 0.5 ? '#16a34a' : '#64748b'}; font-weight: ${row.diff < 0.5 ? '700' : 'normal'};">${diffText}</td>
+        </tr>
+      `;
+    }
+    tableBody.innerHTML = tableHtml;
+
+    // Render SVG Chart
+    renderChart();
+  }
+
+  function renderChart() {
+    let padding = { left: 45, right: 25, top: 25, bottom: 40 };
+    let w = 540;
+    let h = 400;
+    let plotW = w - padding.left - padding.right;
+    let plotH = h - padding.top - padding.bottom;
+
+    let maxVal = 100;
+    for (let item of historyData) {
+      if (item.a > maxVal) maxVal = item.a;
+      if (item.b > maxVal) maxVal = item.b;
+    }
+    maxVal = Math.ceil(maxVal / 10) * 10;
+
+    let svgHtml = `
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect x="${padding.left}" y="${padding.top}" width="${plotW}" height="${plotH}" fill="#fafafa" stroke="#e2e8f0" />
+    `;
+
+    // Horizontal grid & labels
+    let yTicks = 5;
+    for (let i = 0; i <= yTicks; i++) {
+      let val = (maxVal / yTicks) * i;
+      let y = padding.top + plotH - (val / maxVal) * plotH;
+      svgHtml += `
+        <line x1="${padding.left}" y1="${y}" x2="${w - padding.right}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="3,3" />
+        <text x="${padding.left - 8}" y="${y + 4}" font-size="11" fill="#94a3b8" text-anchor="end" font-family="monospace">${val.toFixed(0)}</text>
+      `;
+    }
+
+    // Horizontal axis labels (steps)
+    for (let s = 0; s <= maxSteps; s += (maxSteps <= 15 ? 1 : 2)) {
+      let x = padding.left + (s / maxSteps) * plotW;
+      svgHtml += `
+        <line x1="${x}" y1="${padding.top + plotH}" x2="${x}" y2="${padding.top + plotH + 5}" stroke="#cbd5e1" />
+        <text x="${x}" y="${padding.top + plotH + 18}" font-size="11" fill="#94a3b8" text-anchor="middle" font-family="monospace">${s}</text>
+      `;
+    }
+
+    // Paths
+    let pathA = "";
+    let pathB = "";
+    let nodesA = "";
+    let nodesB = "";
+
+    historyData.forEach((d, idx) => {
+      let x = padding.left + (d.step / maxSteps) * plotW;
+      let yA = padding.top + plotH - (d.a / maxVal) * plotH;
+      let yB = padding.top + plotH - (d.b / maxVal) * plotH;
+
+      if (idx === 0) {
+        pathA += `M ${x} ${yA}`;
+        pathB += `M ${x} ${yB}`;
+      } else {
+        pathA += ` L ${x} ${yA}`;
+        pathB += ` L ${x} ${yB}`;
+      }
+
+      nodesA += `<circle cx="${x}" cy="${yA}" r="4.5" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />`;
+      nodesB += `<circle cx="${x}" cy="${yB}" r="4.5" fill="#ea580c" stroke="#ffffff" stroke-width="1.5" />`;
+    });
+
+    svgHtml += `
+      <path d="${pathA}" fill="none" stroke="#2563eb" stroke-width="2.5" />
+      <path d="${pathB}" fill="none" stroke="#ea580c" stroke-width="2.5" />
+      ${nodesA}
+      ${nodesB}
+    `;
+
+    chartSvg.innerHTML = svgHtml;
+  }
+
+  // Event Listeners
+  [stoichSelect, initASlider, initBSlider, kfSlider, krSlider].forEach(el => {
+    el.addEventListener("input", resetSim);
+  });
+
+  stepBtn.addEventListener("click", doStep);
+  runBtn.addEventListener("click", runToEquilibrium);
+  resetBtn.addEventListener("click", resetSim);
+
+  // Initial Run
+  resetSim();
+</script>
+
+</body>
+</html>
